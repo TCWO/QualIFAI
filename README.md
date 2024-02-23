@@ -1,6 +1,7 @@
 # QualIFAI
 
 # Requirements:
+
 Package                 Version
 ----------------------- ---------
 keras                   2.11.0
@@ -21,6 +22,6 @@ segmentation-models     1.0.1
 tensorflow              2.4.1
 tensorflow-estimator    2.6.0
 tifffile                2021.11.2
-python                    3.7.16
-glob2                     0.7
+python                  3.7.16
+glob2                   0.7
 
