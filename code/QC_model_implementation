@@ -1,0 +1,606 @@
+
+#1LOad librariees
+import cv2
+import pandas as pd
+import os
+from pathlib import Path
+import numpy as np
+import skimage
+import warnings
+warnings.filterwarnings("ignore")
+#2 til splliting
+
+wd=os.getcwd()
+
+
+def split_tiles(input_image_path,output_path):
+        list_files=os.listdir(input_image_path)
+        for i in list_files:
+            list_images=os.listdir(os.path.join(input_image_path,i))
+        
+            for j in list_images:
+                k=Path(j).stem
+                
+                
+              
+                print(j)
+                if os.path.exists(os.path.join(output_path ,i))==False:
+                    os.makedirs(os.path.join(output_path ,i))
+                image=cv2.imread(os.path.join(input_image_path,i,j),-1)
+                #image=image[:,:,0]
+                if 'DAPI' in j:
+                    q2, q98 = np.percentile(image, (2,97))
+                if 'DAPI' not in j:
+                    q2, q98 = np.percentile(image, (10,99.5))
+
+                image = skimage.exposure.rescale_intensity(image, in_range=(q2, q98))
+                tile_width=image.shape[0]
+                tile_height=image.shape[1]
+                factor_w=int(tile_width/312)+1
+                pad_w=(312*factor_w+400)-tile_width
+                factor_h=int(tile_height/312)+1
+                pad_h=(312*factor_h+400)-tile_height
+                X=tile_width+pad_w
+                Y=tile_height+pad_h
+                X2=int(pad_w/2)
+                Y2=int(pad_h/2)
+                im=np.zeros((X,Y),dtype=np.uint16)
+                im[X2:X2+tile_width,Y2:Y2+tile_height]=image
+                m=0
+                
+                while m<=(Y-512):
+                    n=0
+                    while n<=(X-512):
+                        cim=im[n:n+512,m:m+512]
+                        #cim= cv2.resize(cim,(512,512))
+                        
+                        dst = os.path.join(output_path ,i,k+'_'+ str(m)+'_'+str(n)+'.tiff')
+                        #cim=cim*255
+                        cv2.imwrite(dst,cim)  
+                        n=n+312
+                    m=m+312
+                print("Files are saved in",output_path)
+
+
+
+
+##################Classification##################
+
+#1.Load librararies
+import cv2
+import tensorflow
+import os
+
+import numpy as np
+from tensorflow import keras
+from keras.models import load_model
+from keras.applications.resnet50 import preprocess_input as presnet50
+from keras.applications.inception_v3 import preprocess_input as pinceptionv3
+from keras.applications.vgg16 import preprocess_input as pvgg16
+from keras.applications.vgg19 import preprocess_input as pvgg19
+import pandas as pd
+import operator
+import glob2
+import seaborn as sns
+from sklearn.decomposition import PCA
+import pickle as pk
+from random import sample
+from keras.preprocessing.image import img_to_array
+import matplotlib.pyplot as plt
+#2.Load Model
+
+filepath_air_bubbles = os.path.join( wd,'..','models','Air_bubbles_classification_VGG16.hdf5')
+model_air_bubble=load_model(filepath_air_bubbles)
+
+filepath_tissue_fold = os.path.join( wd,'..','models','Tissue_fold_classification_VGG19.hdf5')
+model_tissue_fold=load_model(filepath_tissue_fold)
+
+filepath_external_artifact =os.path.join( wd,'..','models','External_artifacts_classification_VGG16.hdf5') 
+model_external_artifact=load_model(filepath_external_artifact)
+
+filepath_oof =os.path.join( wd,'..','models','Tissue_fold_classification_VGG19.hdf5')
+model_oof=load_model(filepath_oof)
+
+filepath_antibody_aggregates =os.path.join( wd,'..','models','Antibody_aggregates_classification_VGG16.hdf5')
+model_aa=load_model(filepath_antibody_aggregates)
+#3.Classification prediction
+
+
+def euclideanDistance(data1, data2, length):
+    distance = 0
+    for y in range(length+1):
+        distance += np.square(data1.iloc[y] - data2.iloc[y+1])
+    return np.sqrt(distance)
+
+def knn(trainingSet, test, k,c):
+ 
+         distances = {}
+         artifact=0
+         no_artifact=0
+         testInstance=test
+
+         length = testInstance.shape[0]
+         #length=length-2
+         
+         for x in range(len(trainingSet)):
+              dist = euclideanDistance(testInstance.iloc[0], trainingSet.iloc[x], length)
+              distances[x] = dist
+              
+         sorted_d = sorted(distances.items(), key=operator.itemgetter(1))
+         
+         
+         for x in range(k):
+              num=sorted_d[x][0]
+              type=trainingSet.iloc[num]['Type']
+              if type=='Artifact':
+                   artifact+=1
+              else:
+                   no_artifact+=1
+         if artifact>=c:
+               label='Artifact'
+                   
+         elif no_artifact>=c:
+               label='No_Artifact'
+         else:
+               label='doubt'
+                   
+        
+         return(label)
+
+
+
+
+          
+        
+  
+        
+
+def pca_projection(image_path,model_architecture,model_path,clean_pca_model_path):
+    model = load_model(model_path)
+    model=keras.Model(inputs=model.inputs,outputs=model.layers[-2].output)
+    folders = os.listdir(image_path)
+    val=pd.DataFrame()
+    for i in folders:
+     
+        images=os.listdir(os.path.join(image_path,i))
+
+        if model_architecture=='inceptionv3':
+            
+            for  name in images:
+                a=pd.DataFrame()
+                img =cv2.imread(os.path.join(image_path,i,name))
+                x = img_to_array(img)
+                x = np.expand_dims(x, axis=0)
+                x = pinceptionv3(x)
+                a=pd.DataFrame(model.predict(x,verbose=0))
+                a['image_name']=name
+                val=pd.concat([val,a],ignore_index=True)
+
+        
+        if model_architecture=='vgg19':
+            
+            for  name in images:
+                a=pd.DataFrame()
+                img =cv2.imread(os.path.join(image_path,i,name))
+                x = img_to_array(img)
+                x = np.expand_dims(x, axis=0)
+                x = pvgg19(x)
+                a=pd.DataFrame(model.predict(x,verbose=0))
+                a['image_name']=name
+                val=pd.concat([val,a],ignore_index=True) 
+
+
+        if model_architecture=='resnet50':
+        
+            for  name in images:
+                a=pd.DataFrame()
+                img =cv2.imread(os.path.join(image_path,i,name))
+                x = img_to_array(img)
+                x = np.expand_dims(x, axis=0)
+                x = presnet50(x)
+                a=pd.DataFrame(model.predict(x,verbose=0))
+                a['image_name']=name
+                val=pd.concat([val,a],ignore_index=True)
+
+        if model_architecture=='vgg16':
+        
+            for  name in images:
+                a=pd.DataFrame()
+                img =cv2.imread(os.path.join(image_path,i,name))
+                x = img_to_array(img)
+                x = np.expand_dims(x, axis=0)
+                x = pvgg16(x)
+                a=pd.DataFrame(model.predict(x,verbose=0))
+                a['image_name']=name
+                val=pd.concat([val,a],ignore_index=True)
+
+    pca_original=pk.load(open(clean_pca_model_path,"rb"))
+    #pca=PCA(n_components=2)
+    df=val
+    df_sub=df.drop(['image_name'],axis='columns')
+    pca_transform=pca_original.transform(df_sub)
+    df_subset=pd.DataFrame()
+    df_subset['pca-2d-one'] = pca_transform[:,0]
+    df_subset['pca-2d-two'] = pca_transform[:,1]
+    df_subset=df_subset.join(df['image_name'])
+    
+    return(df_subset)
+
+
+
+
+
+
+def classification_prediction(img_path_cl,csv_path,k,n):
+     
+     ab_original_pca=os.path.join(wd,'..','Data','PCA_air_bubbles.pkl')
+     ab_pca=pca_projection(img_path_cl,'vgg16',filepath_air_bubbles,ab_original_pca)
+     ab_csv=pd.read_csv(os.path.join(wd,'..','Data','PCA_air_bubbles.csv'))
+     tf_original_pca=os.path.join(wd,'..','Data','PCA_Tissue_fold.pkl')
+     tf_pca=pca_projection(img_path_cl,'vgg19',filepath_tissue_fold,tf_original_pca)
+     tf_csv=pd.read_csv(os.path.join(wd,'..','Data','PCA_Tissue_fold.csv'))
+     ea_original_pca=os.path.join(wd,'..','Data','PCA_External_artifacts.pkl')
+     ea_pca=pca_projection(img_path_cl,'vgg16',filepath_external_artifact,ea_original_pca)
+     ea_csv=pd.read_csv(os.path.join(wd,'..','Data','PCA_External_artifacts.csv'))
+     oof_original_pca=os.path.join(wd,'..','Data','PCA_Out_of_focus.pkl')
+     oof_pca=pca_projection(img_path_cl,'resnet50',filepath_oof,oof_original_pca)
+     oof_csv=pd.read_csv(os.path.join(wd,'..','Data','PCA_Out_of_focus.csv'))
+     aa_original_pca=os.path.join(wd,'..','Data','PCA_Antibody_aggregates.pkl')
+     aa_pca=pca_projection(img_path_cl,'vgg16',filepath_antibody_aggregates,aa_original_pca)
+     aa_csv=pd.read_csv(os.path.join(wd,'..','Data','PCA_Antibody_aggregates.csv'))
+     
+     artifact_list=[]
+     air_bubbles=[]
+     tissue_fold=[]
+     out_of_focus=[]
+     external_artifacts=[]
+     antibody_aggregates=[]
+     list_img_names=os.listdir(img_path_cl)
+     pr=[]
+     for i in list_img_names:
+        print(i)
+        list_files=os.listdir(os.path.join(img_path_cl,i))
+        for j in list_files:
+            artifact_list.append(os.path.join(i,j))
+            if 'DAPI' in j:
+                img=cv2.imread(os.path.join(img_path_cl,i,j))
+                #img=cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
+                img = img_to_array(img)
+                img = np.expand_dims(img, axis=0)
+                test=ab_pca[ab_pca['image_name']==j]
+                label=knn(ab_csv,test,k,n)
+                img_ab=pvgg16(img)
+                ab=model_air_bubble.predict(img_ab,verbose=0)
+                p=ab[0][0]
+                pr.append(p)
+                if p>0.75  or label=='Artifact':
+                    air_bubbles.append('yes')
+                elif p<=0.25 or label=='No_Artifact':
+                    air_bubbles.append('no')
+                else:
+                    air_bubbles.append('doubt')
+
+                
+        
+
+                img=cv2.imread(os.path.join(img_path_cl,i,j))
+                #img=cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
+                img = img_to_array(img)
+                img = np.expand_dims(img, axis=0)
+                test=oof_pca[oof_pca['image_name']==j]
+                label=knn(oof_csv,test,k,n)
+                img_oof=presnet50(img)
+                oof=model_oof.predict(img_oof,verbose=0)
+                p=oof[0][0]
+                if p>0.75 or label=='Artifact' :
+                    out_of_focus.append('yes')
+                elif p<=0.25 or label=='No_Artifact':
+                    out_of_focus.append('no')
+                else:
+                    out_of_focus.append('doubt')
+
+                img=cv2.imread(os.path.join(img_path_cl,i,j))
+                #img=cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
+                img = img_to_array(img)
+                img = np.expand_dims(img, axis=0)
+                test=tf_pca[tf_pca['image_name']==j]
+                label=knn(tf_csv,test,k,n)
+                img_tf=pvgg19(img)
+                tif=model_tissue_fold.predict(img_tf,verbose=0)
+                p=tif[0][0]
+                if p>0.75 or label=='Artifact' :
+                    tissue_fold.append('yes')
+                elif p<=0.25 or  label=='No_Artifact':
+                    tissue_fold.append('no')
+                else:
+                    tissue_fold.append('doubt')
+
+                img=cv2.imread(os.path.join(img_path_cl,i,j))
+                #img=cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
+                img = img_to_array(img)
+                img = np.expand_dims(img, axis=0)  
+                test=ea_pca[ea_pca['image_name']==j]
+                label=knn(ea_csv,test,k,n)
+                img_ea=pvgg16(img)
+                ea=model_external_artifact.predict(img_ea,verbose=0)
+                p=ea[0][0]
+                if p>0.75 or label=='Artifact' :
+                    external_artifacts.append('yes')
+                elif p<=0.25 or label=='No_Artifact':
+                    external_artifacts.append('no')
+                else:
+                    external_artifacts.append('doubt')
+                antibody_aggregates.append('no')
+
+            if 'DAPI' not in j:
+
+                img=cv2.imread(os.path.join(img_path_cl,i,j))
+                #img=cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
+                img = img_to_array(img)
+                img = np.expand_dims(img, axis=0)  
+                test=aa_pca[aa_pca['image_name']==j]
+                label=knn(aa_csv,test,k,n)
+                img_aa=pvgg16(img)
+                aa=model_aa.predict(img_aa,verbose=0)
+                p=aa[0][0]
+                if p>0.75 or label=='Artifact' :
+                    antibody_aggregates.append('yes')
+                elif p<=0.25 or label=='No_Artifact':
+                    antibody_aggregates.append('no')
+                else:
+                    antibody_aggregates.append('doubt')
+                external_artifacts.append('no')
+                tissue_fold.append('no')
+                out_of_focus.append('no')
+                air_bubbles.append('no')
+
+            
+     list=pd.DataFrame({'Image_name':artifact_list,'external_artifacts':external_artifacts,'air_bubbles':air_bubbles,'out_of_focus':out_of_focus,'tissue_fold':tissue_fold,'antibody_aggregates':antibody_aggregates})
+     list.to_csv(csv_path)
+ 
+
+
+
+
+
+
+################Segmentation################
+
+#1 load libraries
+
+
+import keras
+import os
+os.environ["SM_FRAMEWORK"] = "tf.keras"
+import segmentation_models as sm
+import skimage
+import matplotlib
+import matplotlib.pyplot as plt
+import csv
+from scipy import ndimage
+#2 load models
+model_oof_seg=keras.models.load_model(os.path.join( wd,'..','models','Out_of_focus_segmentation.h5'),compile=False)
+model_external_artifact_seg=keras.models.load_model(os.path.join( '/mnt/data/QC_raw_images/Madhavi/github/models_5/External_artifacts_segmentation.h5') ,compile=False)
+model_air_bubble_seg=keras.models.load_model(os.path.join( wd,'..','models','Air_bubbles_segmentation.h5') ,compile=False)
+model_tissue_fold_seg=keras.models.load_model(os.path.join( wd,'..','models','Tissue_fold_segmentation.h5'),compile=False)
+model_aa_seg=keras.models.load_model( os.path.join( wd,'..','models','Antibody_aggregates_segmentation.h5'),compile=False)
+
+
+#input isthe output list from the classification_prediction_function
+def segmentation(img_path,out_dir,artifact_list):
+        
+       
+        list_artifacts=pd.read_csv(artifact_list)
+        list_artifacts.replace("doubt","yes")
+
+        
+
+
+    
+        unique_names=list_artifacts.Image_name.unique()
+      
+        for p in unique_names:
+            create=p.split('/')[0]
+            if os.path.exists(os.path.join(out_dir,create))==False:
+                os.makedirs(os.path.join(out_dir,create))
+            list_of_artifacts=list_artifacts[list_artifacts['Image_name']==p]
+           
+            if 'yes' in list_of_artifacts['air_bubbles'].unique():
+                BACKBONE = 'vgg16'
+                preprocess_input = sm.get_preprocessing(BACKBONE)
+                img=cv2.imread(os.path.join(img_path,p))
+                #img=cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
+                test_img_input=np.expand_dims(img, 0)
+                test_img_input=preprocess_input(test_img_input)
+                prediction_ab = model_air_bubble_seg.predict(test_img_input,verbose=0)
+                prediction_ab = prediction_ab[0,:,:,0]
+                prediction_ab = skimage.img_as_ubyte(prediction_ab)
+                prediction_ab=prediction_ab/255
+                prediction_ab = prediction_ab > 0.5
+            else:
+                img=cv2.imread(os.path.join(img_path,p))
+                img=img[:,:,0]
+                prediction_ab=img*0
+
+
+            if 'yes' in list_of_artifacts['out_of_focus'].unique():
+                BACKBONE = 'resnet50'
+                preprocess_input = sm.get_preprocessing(BACKBONE)
+                img=cv2.imread(os.path.join(img_path,p))
+                #img=cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
+                test_img_input=np.expand_dims(img, 0)
+                test_img_input=preprocess_input(test_img_input)
+                prediction_oof = model_oof_seg.predict(test_img_input,verbose=0)
+                prediction_oof = prediction_oof[0,:,:,0]
+                prediction_oof = skimage.img_as_ubyte(prediction_oof)
+                prediction_oof=prediction_oof/255
+                prediction_oof = prediction_oof > 0.5
+            else:
+                img=cv2.imread(os.path.join(img_path,p))
+                img=img[:,:,0]
+                prediction_oof=img*0
+
+            if 'yes' in list_of_artifacts['tissue_fold'].unique():
+                BACKBONE = 'vgg19'
+                preprocess_input = sm.get_preprocessing(BACKBONE)
+                img=cv2.imread(os.path.join(img_path,p))
+                #img=cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
+                test_img_input=np.expand_dims(img, 0)
+                test_img_input=preprocess_input(test_img_input)
+                prediction_tif = model_tissue_fold_seg.predict(test_img_input,verbose=0)
+                prediction_tif = prediction_tif[0,:,:,0]
+                prediction_tif = skimage.img_as_ubyte(prediction_tif)
+                prediction_tif=prediction_tif/255
+                prediction_tif = prediction_tif > 0.5
+            else:
+                img=cv2.imread(os.path.join(img_path,p))
+                img=img[:,:,0]
+                prediction_tif=img*0
+
+            if 'yes'in list_of_artifacts['external_artifacts'].unique():
+                BACKBONE = 'vgg16'
+                preprocess_input = sm.get_preprocessing(BACKBONE)
+                img=cv2.imread(os.path.join(img_path,p))
+                #img=cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
+                test_img_input=np.expand_dims(img, 0)
+                test_img_input=preprocess_input(test_img_input)
+                prediction_ea = model_external_artifact_seg.predict(test_img_input,verbose=0)
+                prediction_ea = prediction_ea[0,:,:,0]
+                prediction_ea = skimage.img_as_ubyte(prediction_ea)
+                prediction_ea=prediction_ea/255
+                prediction_ea = prediction_ea>0.3
+            else:
+                img=cv2.imread(os.path.join(img_path,p))
+                img=img[:,:,0]
+                prediction_ea=img*0
+
+
+
+        
+            if 'yes'in list_of_artifacts['antibody_aggregates'].unique():
+                BACKBONE = 'vgg16'
+                preprocess_input = sm.get_preprocessing(BACKBONE)
+                img=cv2.imread(os.path.join(img_path,p))
+                #img=cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
+                test_img_input=np.expand_dims(img, 0)
+                test_img_input=preprocess_input(test_img_input)
+                prediction_aa = model_aa_seg.predict(test_img_input,verbose=0)
+                prediction_aa = prediction_aa[0,:,:,0]
+                prediction_aa = skimage.img_as_ubyte(prediction_aa)
+                prediction_aa=prediction_aa/255
+                prediction_aa = prediction_aa>0.8
+            else:
+                img=cv2.imread(os.path.join(img_path,p))
+                img=img[:,:,0]
+                prediction_aa=img*0
+
+
+
+            
+            predicted_mask=prediction_ab+prediction_oof+prediction_tif+prediction_ea+prediction_aa
+            predicted_mask=ndimage.binary_fill_holes(predicted_mask)
+            predicted_mask=predicted_mask.astype('uint8')
+    
+
+            
+            
+            cv2.imwrite(os.path.join(out_dir,p),predicted_mask*255)
+          
+        
+        
+       
+def merge_predictions(input_image_path,output_path,raw_image_path):
+    list_files=os.listdir(raw_image_path)
+    for i in list_files:
+        list2=os.listdir(raw_image_path+'/'+i)
+        
+        for j in list2:
+            
+                if os.path.exists(output_path +'/'+i+'/')==False:
+                    os.makedirs(output_path +'/'+i+'/')
+                
+                m=0
+                im_big=[]
+                image_big=cv2.imread(raw_image_path+'/'+i+'/'+j)
+                tile_width= image_big.shape[0]
+                tile_height=image_big.shape[1]
+                
+                m=0
+            
+            
+                factor_w=int(tile_width/312)+1
+                pad_w=(312*factor_w+400)-tile_width
+                factor_h=int(tile_height/312)+1
+                pad_h=(312*factor_h+400)-tile_height
+                X=tile_width+pad_w
+                Y=tile_height+pad_h
+                X2=int(pad_w/2)
+                Y2=int(pad_h/2)
+                #im=np.zeros((Y,X),dtype=np.uint16)
+            # im[X2:X2+tile_width,Y2:Y2+tile_height]=image
+                while m<=(Y-512):
+                    n=0
+                    
+            
+                    im1=[]
+                    while n<=(X-512):
+                        
+                        k=j.split('.tif')[0]
+                        img_path='/'+i+'/'+k+'_'+ str(m)+'_'+str(n)+'.tiff'
+                   
+                        im=cv2.imread(input_image_path+'/'+img_path,-1)
+                        
+                        #im=cv2.resize(im,(532,532))
+                        im=im[100:412,100:412]
+                        im1.append(im)   
+                        n=n+312
+                        im_v=cv2.vconcat(im1)
+                        
+                    m=m+312
+                    im_big.append(im_v)
+                im_f=cv2.hconcat(im_big)
+                tile_width1= im_f.shape[0]
+                tile_height1=im_f.shape[1]
+                im_pad=np.zeros((X,Y),dtype=np.uint16)
+                im_pad[100:100+tile_width1,100:100+tile_height1]=im_f
+                im_f2=im_pad[X2:X2+tile_width,Y2:Y2+tile_height]
+                dst=output_path+'/'+i+'/'+k+'.tiff'
+                cv2.imwrite(dst,im_f2) 
+from PIL import Image, ImageOps
+
+def artifacts_free_image(Mask_path,Raw_image_path,output_path):
+    image_list=os.listdir(Raw_image_path)
+
+    for i in image_list:
+
+        if os.path.exists(os.path.join(output_path,i))==False:
+            os.makedirs(os.path.join(output_path,i))
+        list2=os.listdir(os.path.join(Raw_image_path,i))
+
+        for l in list2:
+
+            Masks=cv2.imread(os.path.join(Mask_path,i,l),-1)
+            Masks=Masks/255
+            Mask1=1-Masks
+            Raw_image=cv2.imread(os.path.join(Raw_image_path,i,l),-1)
+            New_image=Raw_image*Mask1
+            New_image=New_image.astype('uint16')
+            dst=os.path.join(output_path,i,l)
+            cv2.imwrite(dst,New_image)
+
+
+
+
+def QualIFAI(input_image_path,output_corrected_image_path):
+    path_output_tiles=os.path.join(wd,'..','cut_tiles')
+    split_tiles(input_image_path,path_output_tiles)
+    csv_path=os.path.join(wd,'..','Data','classification_prediction.csv')
+    k=10
+    n=8
+    classification_prediction(path_output_tiles,csv_path,k,n)
+    out_dir_masks=os.path.join(wd,'..','mask')
+    segmentation(path_output_tiles,out_dir_masks,csv_path)
+    output_mask_stitch=os.path.join(wd,'..','stitch_masks')
+    merge_predictions(out_dir_masks,output_mask_stitch,input_image_path)
+    artifacts_free_image(output_mask_stitch,input_image_path,output_corrected_image_path)
+    
