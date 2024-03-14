@@ -89,19 +89,19 @@ from keras.preprocessing.image import img_to_array
 import matplotlib.pyplot as plt
 #2.Load Model
 
-filepath_air_bubbles = os.path.join( wd,'..','models','Air_bubbles_classification_VGG16.hdf5')
+filepath_air_bubbles = os.path.join( wd,'..','Classification_models','Air_bubbles_classification_VGG16.hdf5')
 model_air_bubble=load_model(filepath_air_bubbles)
 
-filepath_tissue_fold = os.path.join( wd,'..','models','Tissue_fold_classification_VGG19.hdf5')
+filepath_tissue_fold = os.path.join( wd,'..','Classification_models','Tissue_fold_classification_VGG19.hdf5')
 model_tissue_fold=load_model(filepath_tissue_fold)
 
-filepath_external_artifact =os.path.join( wd,'..','models','External_artifacts_classification_VGG16.hdf5') 
+filepath_external_artifact =os.path.join( wd,'..','Classification_models','External_artifacts_classification_VGG16.hdf5') 
 model_external_artifact=load_model(filepath_external_artifact)
 
-filepath_oof =os.path.join( wd,'..','models','Tissue_fold_classification_VGG19.hdf5')
+filepath_oof =os.path.join( wd,'..','Classification_models','Tissue_fold_classification_VGG19.hdf5')
 model_oof=load_model(filepath_oof)
 
-filepath_antibody_aggregates =os.path.join( wd,'..','models','Antibody_aggregates_classification_VGG16.hdf5')
+filepath_antibody_aggregates =os.path.join( wd,'..','Classification_models','Antibody_aggregates_classification_VGG16.hdf5')
 model_aa=load_model(filepath_antibody_aggregates)
 #3.Classification prediction
 
@@ -379,11 +379,11 @@ import matplotlib.pyplot as plt
 import csv
 from scipy import ndimage
 #2 load models
-model_oof_seg=keras.models.load_model(os.path.join( wd,'..','models','Out_of_focus_segmentation.h5'),compile=False)
-model_external_artifact_seg=keras.models.load_model(os.path.join( '/mnt/data/QC_raw_images/Madhavi/github/models_5/External_artifacts_segmentation.h5') ,compile=False)
-model_air_bubble_seg=keras.models.load_model(os.path.join( wd,'..','models','Air_bubbles_segmentation.h5') ,compile=False)
-model_tissue_fold_seg=keras.models.load_model(os.path.join( wd,'..','models','Tissue_fold_segmentation.h5'),compile=False)
-model_aa_seg=keras.models.load_model( os.path.join( wd,'..','models','Antibody_aggregates_segmentation.h5'),compile=False)
+model_oof_seg=keras.models.load_model(os.path.join( wd,'..','Segmentation_models','Out_of_focus_segmentation.h5'),compile=False)
+model_external_artifact_seg=keras.models.load_model(os.path.join( wd,'..','Segmentation_models','External_artifacts_segmentation.h5') ,compile=False)
+model_air_bubble_seg=keras.models.load_model(os.path.join( wd,'..','Segmentation_models','Air_bubbles_segmentation.h5') ,compile=False)
+model_tissue_fold_seg=keras.models.load_model(os.path.join( wd,'..','Segmentation_models','Tissue_fold_segmentation.h5'),compile=False)
+model_aa_seg=keras.models.load_model( os.path.join( wd,'..','Segmentation_models','Antibody_aggregates_segmentation.h5'),compile=False)
 
 
 #input isthe output list from the classification_prediction_function
