@@ -98,7 +98,7 @@ model_tissue_fold=load_model(filepath_tissue_fold)
 filepath_external_artifact =os.path.join( wd,'..','Classification_models','External_artifacts_classification_VGG16.hdf5') 
 model_external_artifact=load_model(filepath_external_artifact)
 
-filepath_oof =os.path.join( wd,'..','Classification_models','Tissue_fold_classification_VGG19.hdf5')
+filepath_oof =os.path.join( wd,'..','Classification_models','Out_of_focus_classification_resnet50.hdf5') 
 model_oof=load_model(filepath_oof)
 
 filepath_antibody_aggregates =os.path.join( wd,'..','Classification_models','Antibody_aggregates_classification_VGG16.hdf5')
