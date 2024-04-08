@@ -15,7 +15,8 @@ Qual-IF-AI consists of two modules 1. Classification : Identification of image p
 ### Usage
 In this section the usage of QUAL-IF-AI is described. In brief, input images are tesselated into patches of fixed size (512x512). Second, the tiles are classified between "clean" and "having artifacts". Third, the patches identified as "having artifacts" are segmented. Finally, the results are ensembled generating the final artifact mask. This mask is eventually applied to the input image to subtract the affected area for downstream analyses. This process will be ilustrated using an in-house-generated Diffuse large B cell lymphoma and kidney tissue images acquired with the MILAN [ref] multiplexing technology. The input image looks as follows:
 
-
+## Citation
+[Bioarxiv](https://www.biorxiv.org/content/10.1101/2024.01.26.577391v1.abstract)
 
 ## Requirements:
 
