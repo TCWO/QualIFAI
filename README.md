@@ -23,7 +23,7 @@ In this section the usage of QUAL-IF-AI is described. In brief, input images are
 
 ## Requirements:
 
-The proper version of required packages are listed in requirements and could be installed using the command:
+The proper version of required packages are listed in the "requirements" file and could be installed using the command:
 pip install -r requirements
 
 
