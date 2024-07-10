@@ -89,7 +89,7 @@ from keras.preprocessing.image import img_to_array
 import matplotlib.pyplot as plt
 #2.Load Model
 
-filepath_air_bubbles = os.path.join( wd,'..','Classification_models','Air_bubbles_classification_VGG16.hdf5')
+filepath_air_bubbles = os.path.join( wd,'..','Classification_models','Air_bubbles_classification_VGG19.hdf5')
 model_air_bubble=load_model(filepath_air_bubbles)
 
 filepath_tissue_fold = os.path.join( wd,'..','Classification_models','Tissue_fold_classification_VGG19.hdf5')
@@ -98,10 +98,10 @@ model_tissue_fold=load_model(filepath_tissue_fold)
 filepath_external_artifact =os.path.join( wd,'..','Classification_models','External_artifacts_classification_VGG16.hdf5') 
 model_external_artifact=load_model(filepath_external_artifact)
 
-filepath_oof =os.path.join( wd,'..','Classification_models','Out_of_focus_classification_resnet50.hdf5') 
+filepath_oof =os.path.join( wd,'..','Classification_models','Out_of_focus_classification_VGG19.hdf5') 
 model_oof=load_model(filepath_oof)
 
-filepath_antibody_aggregates =os.path.join( wd,'..','Classification_models','Antibody_aggregates_classification_VGG16.hdf5')
+filepath_antibody_aggregates =os.path.join( wd,'..','Classification_models','Antibody_aggregates_classification_VGG19.hdf5')
 model_aa=load_model(filepath_antibody_aggregates)
 #3.Classification prediction
 
@@ -269,7 +269,7 @@ def classification_prediction(img_path_cl,csv_path,k,n):
                 img = np.expand_dims(img, axis=0)
                 test=ab_pca[ab_pca['image_name']==j]
                 label=knn(ab_csv,test,k,n)
-                img_ab=pvgg16(img)
+                img_ab=pvgg19(img)
                 ab=model_air_bubble.predict(img_ab,verbose=0)
                 p=ab[0][0]
                 pr.append(p)
@@ -289,7 +289,7 @@ def classification_prediction(img_path_cl,csv_path,k,n):
                 img = np.expand_dims(img, axis=0)
                 test=oof_pca[oof_pca['image_name']==j]
                 label=knn(oof_csv,test,k,n)
-                img_oof=presnet50(img)
+                img_oof=pvgg19(img)
                 oof=model_oof.predict(img_oof,verbose=0)
                 p=oof[0][0]
                 if p>0.75 or label=='Artifact' :
@@ -340,7 +340,7 @@ def classification_prediction(img_path_cl,csv_path,k,n):
                 img = np.expand_dims(img, axis=0)  
                 test=aa_pca[aa_pca['image_name']==j]
                 label=knn(aa_csv,test,k,n)
-                img_aa=pvgg16(img)
+                img_aa=pvgg19(img)
                 aa=model_aa.predict(img_aa,verbose=0)
                 p=aa[0][0]
                 if p>0.75 or label=='Artifact' :
@@ -406,7 +406,7 @@ def segmentation(img_path,out_dir,artifact_list):
             list_of_artifacts=list_artifacts[list_artifacts['Image_name']==p]
            
             if 'yes' in list_of_artifacts['air_bubbles'].unique():
-                BACKBONE = 'vgg16'
+                BACKBONE = 'vgg19'
                 preprocess_input = sm.get_preprocessing(BACKBONE)
                 img=cv2.imread(os.path.join(img_path,p))
                 #img=cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
@@ -424,7 +424,7 @@ def segmentation(img_path,out_dir,artifact_list):
 
 
             if 'yes' in list_of_artifacts['out_of_focus'].unique():
-                BACKBONE = 'resnet50'
+                BACKBONE = 'vgg19'
                 preprocess_input = sm.get_preprocessing(BACKBONE)
                 img=cv2.imread(os.path.join(img_path,p))
                 #img=cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
@@ -478,7 +478,7 @@ def segmentation(img_path,out_dir,artifact_list):
 
         
             if 'yes'in list_of_artifacts['antibody_aggregates'].unique():
-                BACKBONE = 'vgg16'
+                BACKBONE = 'vgg19'
                 preprocess_input = sm.get_preprocessing(BACKBONE)
                 img=cv2.imread(os.path.join(img_path,p))
                 #img=cv2.cvtColor(img,cv2.COLOR_GRAY2RGB)
