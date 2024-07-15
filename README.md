@@ -19,7 +19,7 @@ In this section the usage of QUAL-IF-AI is described. In brief, input images are
 
 ## Trained models:
 To use the trained models please first download them from:
-[Models](https://zenodo.org/records/11204248)
+[Models](https://zenodo.org/records/11204248) (Check out the latest version)
 and put them in the proper folders (if they are segmentation models in "Segmentation_models" and if they are classification models in "Classification_models" folder.
 
 ## Citation
